@@ -7,20 +7,25 @@ interface AIAnalysisResponse extends Omit<AIAnalysis, 'technicalIndicators'> {
     movingAverage?: string;
   };
   narrative?: string;
+  narrativeText?: string;
   stockCode?: string;
   stockName?: string;
 }
 
 export async function fetchStockAnalysis(stockCode: string) {
-  await requestJson<unknown>(`/api/v1/ai-narratives/${encodeURIComponent(stockCode)}/analyze`, {
+  const analyzedData = await requestJson<Partial<AIAnalysisResponse>>(`/api/v1/ai-narratives/${encodeURIComponent(stockCode)}/analyze`, {
     method: 'POST',
   });
 
-  const data = await requestJson<AIAnalysisResponse>(`/api/v1/ai-narratives/${encodeURIComponent(stockCode)}/narrative`);
+  const narrativeData = await requestJson<AIAnalysisResponse>(`/api/v1/ai-narratives/${encodeURIComponent(stockCode)}/narrative`);
+  const data = {
+    ...analyzedData,
+    ...narrativeData,
+  };
   const technicalIndicators = data.technicalIndicators ?? {};
 
   return {
-    summary: data.summary ?? data.narrative ?? 'AI 분석 결과를 불러왔습니다.',
+    summary: data.summary ?? data.narrativeText ?? data.narrative ?? 'AI 분석 결과를 불러왔습니다.',
     recommendation: data.recommendation ?? '보유',
     targetPrice: data.targetPrice ?? 0,
     confidence: data.confidence ?? 0,

@@ -142,7 +142,7 @@ function App() {
         setSelectedStock(mergedStock);
         setChartData(generateChartData(mergedStock.price));
         setSectorAvg(getSectorAverage(mergedStock.sector));
-        setSelectedStockNews(getNewsByStockCode(mergedStock.code));
+        setSelectedStockNews(summary.news && summary.news.length > 0 ? summary.news : getNewsByStockCode(mergedStock.code));
       } catch (error) {
         if (!isMounted) return;
         setChartData(generateChartData(stock.price));

@@ -4,36 +4,38 @@
  * 1) 종목 리스트
  * GET /api/stocks
  *
- * 백엔드 StockSummaryResponseDto 기준 응답 예시:
- * [
- *   {
- *     "stockCode": "005930",
- *     "stockName": "삼성전자",
- *     "sector": "반도체",
- *     "priceInfo": {
- *       "currentPrice": "71800",
- *       "changePrice": "1200",
- *       "changeRate": "1.7",
- *       "volume": 12450000,
- *       "openPrice": "70600",
- *       "highPrice": "72400",
- *       "lowPrice": "70100"
- *     },
- *     "valuationInfo": {
- *       "calculatedPer": "18.5",
- *       "calculatedPbr": "1.2",
- *       "calculatedRoe": "6.5",
- *       "eps": "3881",
- *       "bps": "59833"
- *     },
- *     "marketCapInfo": {
- *       "marketCap": 42850,
- *       "listedShares": 5969782550,
- *       "floatingShares": 4460000000,
- *       "floatingRatio": "74.7"
+ * 백엔드 최신 응답 예시:
+ * {
+ *   "stockCode": "005930",
+ *   "stockName": "삼성전자",
+ *   "sectorName": "반도체",
+ *   "status": {
+ *     "currentPrice": 360500,
+ *     "changeRate": 3.30,
+ *     "todayVolume": 44720282,
+ *     "highPrice": 370000,
+ *     "lowPrice": 342000
+ *   },
+ *   "value": {
+ *     "marketCap": 21075834,
+ *     "operatingProfit": 0.00,
+ *     "per": 54.58,
+ *     "pbr": 5.63,
+ *     "roe": 10.3200
+ *   },
+ *   "trend": {
+ *     "periodDays": 5,
+ *     "priceDirection": "UP",
+ *     "avgChangeRate": 2.25,
+ *     "volumeTrend": "STABLE"
+ *   },
+ *   "newsHeadlines": [
+ *     {
+ *       "title": "삼성전자, 메타 제치고 세계 시총 10위",
+ *       "description": "뉴스 설명"
  *     }
- *   }
- * ]
+ *   ]
+ * }
  *
  * 2) 종목 차트
  * GET /api/stocks/{stockCode}/chart?range=30d
@@ -134,6 +136,36 @@ export interface StockSummaryResponseDto {
     floatingShares: number;
     floatingRatio: string;
   };
+}
+
+export interface BackendStockSummaryResponseDto {
+  stockCode: string;
+  stockName: string;
+  sectorName?: string;
+  status: {
+    currentPrice: number;
+    changeRate: number;
+    todayVolume: number;
+    highPrice?: number;
+    lowPrice?: number;
+  };
+  value: {
+    marketCap: number;
+    operatingProfit?: number;
+    per?: number;
+    pbr?: number;
+    roe?: number;
+  };
+  trend?: {
+    periodDays: number;
+    priceDirection: string;
+    avgChangeRate: number;
+    volumeTrend: string;
+  };
+  newsHeadlines?: {
+    title: string;
+    description: string;
+  }[];
 }
 
 export interface StockPriceHistory {

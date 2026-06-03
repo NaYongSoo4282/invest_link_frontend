@@ -1,10 +1,11 @@
-import type { ChartData, Stock } from '../data/stockData';
+import type { ChartData, NewsItem, Stock } from '../data/stockData';
 import { requestJson } from './client';
-import type { StockPriceHistory, StockSummaryResponseDto } from './types';
+import type { BackendStockSummaryResponseDto, StockPriceHistory, StockSummaryResponseDto } from './types';
 
 type LooseStockApiResponse = Record<string, unknown>;
-type StockApiResponse = Stock | StockSummaryResponseDto | LooseStockApiResponse;
+type StockApiResponse = Stock | StockSummaryResponseDto | BackendStockSummaryResponseDto | LooseStockApiResponse;
 type StockListResponse = StockApiResponse[] | { data?: StockApiResponse[]; stocks?: StockApiResponse[]; ticks?: StockApiResponse[] };
+export type StockSummaryDetail = Stock & { news?: NewsItem[] };
 
 const toNumber = (value: string | number | unknown) => {
   if (value === undefined) return undefined;
@@ -16,6 +17,10 @@ const isStockSummaryResponse = (stock: StockApiResponse): stock is StockSummaryR
   return 'stockCode' in stock && 'priceInfo' in stock;
 };
 
+const isBackendStockSummaryResponse = (stock: StockApiResponse): stock is BackendStockSummaryResponseDto => {
+  return 'stockCode' in stock && 'status' in stock && 'value' in stock;
+};
+
 const isFrontendStock = (stock: StockApiResponse): stock is Stock => {
   return 'id' in stock && 'code' in stock && 'name' in stock && 'price' in stock;
 };
@@ -24,9 +29,49 @@ const toStringValue = (value: unknown, fallback?: string) => {
   return typeof value === 'string' || typeof value === 'number' ? String(value) : fallback;
 };
 
-const normalizeStock = (stock: StockApiResponse): Stock => {
+const getChangePrice = (currentPrice: number, changeRate: number) => {
+  if (!currentPrice || !changeRate) return 0;
+  const previousPrice = currentPrice / (1 + changeRate / 100);
+  return Math.round(currentPrice - previousPrice);
+};
+
+const normalizeNews = (stock: StockApiResponse): NewsItem[] | undefined => {
+  if (!isBackendStockSummaryResponse(stock) || !stock.newsHeadlines) return undefined;
+
+  return stock.newsHeadlines.map((news, index) => ({
+    id: `${stock.stockCode}-headline-${index}`,
+    title: news.title,
+    source: '뉴스',
+    time: '방금 전',
+    category: stock.sectorName,
+    description: news.description,
+  }));
+};
+
+const normalizeStock = (stock: StockApiResponse): StockSummaryDetail => {
   if (isFrontendStock(stock)) {
     return stock;
+  }
+
+  if (isBackendStockSummaryResponse(stock)) {
+    const currentPrice = toNumber(stock.status.currentPrice) ?? 0;
+    const changeRate = toNumber(stock.status.changeRate) ?? 0;
+
+    return {
+      id: stock.stockCode,
+      code: stock.stockCode,
+      name: stock.stockName,
+      price: currentPrice,
+      change: getChangePrice(currentPrice, changeRate),
+      changePercent: changeRate,
+      marketCap: toNumber(stock.value.marketCap) ?? 0,
+      volume: toNumber(stock.status.todayVolume) ?? 0,
+      per: toNumber(stock.value.per),
+      pbr: toNumber(stock.value.pbr),
+      roe: toNumber(stock.value.roe),
+      sector: stock.sectorName,
+      news: normalizeNews(stock),
+    };
   }
 
   if (!isStockSummaryResponse(stock)) {
