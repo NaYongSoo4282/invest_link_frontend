@@ -16,9 +16,12 @@ import {
   stocks as mockStocks,
 } from './data/stockData';
 import type { AIAnalysis } from './api';
+import {
+  fetchStockAnalysis,
+  fetchStockSummary,
+  fetchStocks,
+} from './api';
 import { BarChart3, User, Star, Sparkles, Home } from 'lucide-react';
-
-const MOCK_ANALYSIS_DELAY_MS = 700;
 
 function createMockAnalysis(stock: Stock): AIAnalysis {
   const isPositive = stock.changePercent >= 0;
@@ -68,7 +71,7 @@ function App() {
   const [sectorAvg, setSectorAvg] = useState<SectorAverage | null>(getSectorAverage(mockStocks[0]?.sector));
   const [selectedStockNews, setSelectedStockNews] = useState<NewsItem[]>(getNewsByStockCode(mockStocks[0]?.code ?? ''));
   const [analysisByStockCode, setAnalysisByStockCode] = useState<Record<string, AIAnalysis>>({});
-  const [isInitialLoading, setIsInitialLoading] = useState(false);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isChartLoading, setIsChartLoading] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
@@ -80,22 +83,84 @@ function App() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   useEffect(() => {
-    setStocks(mockStocks);
-    setSectorIndices(mockSectorIndices);
-    setSelectedStock((prev) => prev ?? mockStocks[0] ?? null);
-    setApiError(null);
-    setIsInitialLoading(false);
+    let isMounted = true;
+
+    async function loadInitialData() {
+      try {
+        setApiError(null);
+        const stockData = await fetchStocks();
+
+        if (!isMounted) return;
+
+        if (stockData.length > 0) {
+          setStocks(stockData);
+          setSelectedStock(stockData[0]);
+        } else {
+          setStocks(mockStocks);
+          setSelectedStock(mockStocks[0] ?? null);
+        }
+
+        setSectorIndices(mockSectorIndices);
+      } catch (error) {
+        if (!isMounted) return;
+        setStocks(mockStocks);
+        setSectorIndices(mockSectorIndices);
+        setSelectedStock(mockStocks[0] ?? null);
+        setApiError('백엔드 연결이 불안정해서 mock 데이터로 화면을 표시합니다.');
+      } finally {
+        if (isMounted) {
+          setIsInitialLoading(false);
+        }
+      }
+    }
+
+    loadInitialData();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   useEffect(() => {
     if (!selectedStock) return;
+    let isMounted = true;
 
-    setIsChartLoading(false);
-    setApiError(null);
-    setChartData(generateChartData(selectedStock.price));
-    setSectorAvg(getSectorAverage(selectedStock.sector));
-    setSelectedStockNews(getNewsByStockCode(selectedStock.code));
-  }, [selectedStock]);
+    async function loadSelectedStockData(stock: Stock) {
+      setIsChartLoading(true);
+      setApiError(null);
+
+      try {
+        const summary = await fetchStockSummary(stock.code);
+        if (!isMounted) return;
+
+        const mergedStock = {
+          ...stock,
+          ...summary,
+          sector: summary.sector ?? stock.sector,
+        };
+
+        setSelectedStock(mergedStock);
+        setChartData(generateChartData(mergedStock.price));
+        setSectorAvg(getSectorAverage(mergedStock.sector));
+        setSelectedStockNews(getNewsByStockCode(mergedStock.code));
+      } catch (error) {
+        if (!isMounted) return;
+        setChartData(generateChartData(stock.price));
+        setSectorAvg(getSectorAverage(stock.sector));
+        setSelectedStockNews(getNewsByStockCode(stock.code));
+      } finally {
+        if (isMounted) {
+          setIsChartLoading(false);
+        }
+      }
+    }
+
+    loadSelectedStockData(selectedStock);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedStock?.code]);
 
   // 로그인 처리
   const handleLogin = (email: string, password: string) => {
@@ -169,15 +234,24 @@ function App() {
 
     setApiError(null);
 
-    window.setTimeout(() => {
-      const analysis = createMockAnalysis(selectedStock);
+    try {
+      const analysis = await fetchStockAnalysis(selectedStock.code);
       setAnalysisByStockCode((prev) => ({
         ...prev,
         [selectedStock.code]: analysis,
       }));
       setActiveTab('ai-analysis');
+    } catch (error) {
+      const analysis = createMockAnalysis(selectedStock);
+      setAnalysisByStockCode((prev) => ({
+        ...prev,
+        [selectedStock.code]: analysis,
+      }));
+      setApiError('AI 분석 API 연결이 불안정해서 mock 분석 결과로 표시합니다.');
+      setActiveTab('ai-analysis');
+    } finally {
       setIsAnalyzing(false);
-    }, MOCK_ANALYSIS_DELAY_MS);
+    }
   };
 
   // 업종별 필터
